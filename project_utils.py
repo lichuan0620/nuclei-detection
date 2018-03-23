@@ -112,7 +112,7 @@ def standardize_images(img_list, shape=None, grayscale=False):
     the same shape
     load the test set from the given path
     """
-    to_return = [rgb2gray(img) if grayscale else img[:, :, :3] for img in img_list]
+    to_return = [np.expand_dims(rgb2gray(img), axis=-1) if grayscale else img[:, :, :3] for img in img_list]
     if shape is not None:
         to_return = [resize(img, shape, mode='reflect') for img in to_return]
     return np.array(to_return)
