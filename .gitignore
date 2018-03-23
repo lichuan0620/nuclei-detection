@@ -1,6 +1,9 @@
 
 *.csv
 *.png
+*.h5
 .ipynb_checkpoints/
 .idea/
 __pycache__/
+submission/
+checkpoints/

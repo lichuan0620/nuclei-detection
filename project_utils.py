@@ -1,5 +1,6 @@
 import os
 import random
+from time import strftime
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ from IPython.display import clear_output
 from skimage.io import imread
 from skimage.transform import resize
 from skimage.color import rgb2gray
+from skimage.morphology import label
 
 np.random.seed()
 random.seed()
@@ -83,10 +85,10 @@ def compare_images(imlist1, imlist2, sample=3, title1='', title2=''):
     _, axis = plt.subplots(sample, 2, figsize=(12, sample*6))
     samples = random.sample(range(len(imlist1)), sample)
     for i, sample in enumerate(samples):
-        axis[i, 0].imshow(imlist1[sample])
         axis[i, 0].set_title(title1)
-        axis[i, 1].imshow(imlist2[sample])
+        axis[i, 0].imshow(imlist1[sample])
         axis[i, 1].set_title(title2)
+        axis[i, 1].imshow(imlist2[sample])
 
 
 def get_dim_stat(images):
@@ -106,7 +108,7 @@ def get_dim_stat(images):
     )
 
 
-def standardize_images(img_list, shape=None, grayscale=False):
+def standardize_images(img_list, shape=None, grayscale=False, dtype=np.float32):
     """
     given a list of images, return a resized version where all the images within have
     the same shape
@@ -114,8 +116,8 @@ def standardize_images(img_list, shape=None, grayscale=False):
     """
     to_return = [np.expand_dims(rgb2gray(img), axis=-1) if grayscale else img[:, :, :3] for img in img_list]
     if shape is not None:
-        to_return = [resize(img, shape, mode='reflect') for img in to_return]
-    return np.array(to_return)
+        to_return = [resize(img, shape) for img in to_return]
+    return np.array(to_return, dtype=dtype)
 
 
 def augment_data(X, Y, vertical_flip=False, horizontal_flip=False, rotate=False):
@@ -143,3 +145,82 @@ def augment_data(X, Y, vertical_flip=False, horizontal_flip=False, rotate=False)
         Y_ = np.append(Y_, np.flip(np.flip(Y, axis=1), axis=2), axis=0)
 
     return X_, Y_
+
+
+def show_history(history, metric_name='acc', validation=True):
+    _, axis = plt.subplots(1, 2, figsize=(12, 6))
+    x = range(1, len(history[metric_name])+1)
+    axis[0].plot(x, history[metric_name], label='train '+metric_name)
+    axis[1].plot(x, history['loss'], label='train loss')
+    if validation:
+        axis[0].plot(x, history['val_'+metric_name], label='valid '+metric_name)
+        axis[1].plot(x, history['val_loss'], label='valid loss')
+    axis[0].grid(True)
+    axis[1].grid(True)
+    axis[0].xlabel('epoch')
+    axis[0].ylabel(metric_name)
+    axis[1].xlabel('epoch')
+    axis[1].ylabel('loss')
+    axis[0].legend()
+    axis[1].legend()
+
+
+def resize_prediction(original, predicted):
+    """
+    Resize the predicted mask to their original size
+    :param original: the original images (X_)
+    :param predicted: the predicted masks (Y_)
+    :return: resized Y_ that matches the sizes of those in X_
+    """
+    return np.array([resize(y, x.shape[:2]) for x, y in zip(original, predicted)])
+
+
+def format_prediction(predicted, threshold=None, original=None, reduce_dimension=False):
+    """
+    """
+    to_return = predicted
+    if threshold is not None:
+        to_return = to_return > threshold
+    if original is not None:
+        to_return = resize_prediction(original, predicted)
+    if reduce_dimension:
+        to_return = np.squeeze(to_return)
+    return to_return
+
+
+def rle_encoding(x):
+    """
+    """
+    dots = np.where(x.T.flatten() == 1)[0]
+    run_lengths = []
+    prev = -2
+    for b in dots:
+        if b > prev+1:
+            run_lengths.extend((b + 1, 0))
+        run_lengths[-1] += 1
+        prev = b
+    return run_lengths
+
+
+def prob_to_rles(x, cutoff=0.5):
+    lab_img = label(x > cutoff)
+    for i in range(1, lab_img.max() + 1):
+        yield rle_encoding(lab_img == i)
+
+
+def make_submittable(ids, Y_, title='submission'):
+    """
+    """
+    new_test_ids = []
+    rles = []
+    for n, id_ in enumerate(ids):
+        rle = list(prob_to_rles(Y_[n]))
+        rles.extend(rle)
+        new_test_ids.extend([id_] * len(rle))
+    to_return = pd.DataFrame({
+        'ImageId': new_test_ids,
+        'EncodedPixels': pd.Series(rles).apply(lambda x: ' '.join(str(y) for y in x))
+    })
+    file_name = 'submission/' + title + '_' + strftime("%Y%m%d-%H%M%S") + '.csv'
+    to_return.to_csv(file_name, index=False)
+    return file_name
