@@ -6,3 +6,4 @@ Data are provided by the competition's host and can be downloaded [here](https:/
   
 ## Performance (mean IoU, Kaggle LB score)
 U-Net Baseline - 0.310
+U-Net Tuned - 0.319
