@@ -24,9 +24,9 @@ def hint(message):
 def load_mask(path):
     """given the sample dir path, load and assemble the mask image files"""
     mask_ids = iter(next(os.walk(path + '/masks/'))[2])
-    mask = imread(path + '/masks/' + next(mask_ids))
+    mask = rgb2gray(imread(path + '/masks/' + next(mask_ids)))
     for m_id in mask_ids:
-        mask += imread(path + '/masks/' + m_id)
+        mask = np.maximum(mask, rgb2gray(imread(path + '/masks/' + m_id)))
     return mask
 
 
@@ -108,7 +108,7 @@ def get_dim_stat(images):
     )
 
 
-def standardize_images(img_list, shape=None, grayscale=False, dtype=np.float32):
+def standardize_images(img_list, shape=None, grayscale=True, dtype=np.float32):
     """
     given a list of images, return a resized version where all the images within have
     the same shape
@@ -120,7 +120,7 @@ def standardize_images(img_list, shape=None, grayscale=False, dtype=np.float32):
     return np.array(to_return, dtype=dtype)
 
 
-def augment_data(X, Y, vertical_flip=False, horizontal_flip=False, rotate=False):
+def augment_data(X, Y, vertical_flip=False, horizontal_flip=False, rotate=False, inverse_color=False):
     """
     Add augmented data to a copy of the original data
     :param X: the samples
@@ -128,6 +128,7 @@ def augment_data(X, Y, vertical_flip=False, horizontal_flip=False, rotate=False)
     :param vertical_flip: whether or not to flip the image vertically
     :param horizontal_flip: whether or not to flip the image horizontally
     :param rotate: whether or not to rotate the image 180
+    :param inverse_color: whether or not to inverse the color of the image
     :return: a new array containing the original and the augmented data
     """
     X_, Y_ = X, Y
@@ -144,6 +145,11 @@ def augment_data(X, Y, vertical_flip=False, horizontal_flip=False, rotate=False)
         X_ = np.append(X_, np.flip(np.flip(X, axis=1), axis=2), axis=0)
         Y_ = np.append(Y_, np.flip(np.flip(Y, axis=1), axis=2), axis=0)
 
+    if inverse_color:
+        assert X.shape[3] is 1
+        X_ = np.append(X_, 1-X, axis=0)
+        Y_ = np.append(Y_, Y, axis=0)
+
     return X_, Y_
 
 
@@ -157,10 +163,8 @@ def show_history(history, metric_name='acc', validation=True):
         axis[1].plot(x, history['val_loss'], label='valid loss')
     axis[0].grid(True)
     axis[1].grid(True)
-    axis[0].xlabel('epoch')
-    axis[0].ylabel(metric_name)
-    axis[1].xlabel('epoch')
-    axis[1].ylabel('loss')
+    axis[0].set_title(metric_name)
+    axis[1].set_title('loss')
     axis[0].legend()
     axis[1].legend()
 
