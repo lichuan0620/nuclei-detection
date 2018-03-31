@@ -5,5 +5,5 @@ In the [2018 Data Science Bowl](https://www.kaggle.com/c/data-science-bowl-2018)
 Data are provided by the competition's host and can be downloaded [here](https://www.kaggle.com/c/data-science-bowl-2018/data). To run the notebooks, unzip the training data at data/train/ and test data at data/test.
   
 ## Performance (mean IoU, Kaggle LB score)
-U-Net Baseline - 0.310
-U-Net Tuned - 0.319
+U-Net Baseline - 0.310  
+U-Net Benchmark - 0.355  

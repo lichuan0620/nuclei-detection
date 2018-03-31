@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from IPython.display import clear_output
-from skimage.io import imread
+from skimage.io import imread, imshow
 from skimage.transform import resize
 from skimage.color import rgb2gray
 from skimage.morphology import label
@@ -21,12 +21,18 @@ def hint(message):
     print(message)
 
 
+def load_single_mask(path):
+    mask = imread(path)
+    return rgb2gray(mask) if len(mask.shape) is 3 else mask/255
+
+
 def load_mask(path):
     """given the sample dir path, load and assemble the mask image files"""
     mask_ids = iter(next(os.walk(path + '/masks/'))[2])
-    mask = rgb2gray(imread(path + '/masks/' + next(mask_ids)))
+    mask = load_single_mask(path + '/masks/' + next(mask_ids))
     for m_id in mask_ids:
-        mask = np.maximum(mask, rgb2gray(imread(path + '/masks/' + m_id)))
+        tmp = load_single_mask(path + '/masks/' + m_id)
+        mask = np.maximum(mask, tmp)
     return mask
 
 
@@ -39,7 +45,7 @@ def load_images(path, img_ids, report):
     """given the sample dir path, load the image with the given ids"""
     if report:
         img_ids = tqdm(img_ids)
-    return np.array([load_img(path+img_id, img_id) for i, img_id in enumerate(img_ids)])
+    return [load_img(path+img_id, img_id) for i, img_id in enumerate(img_ids)]
 
 
 def load_masks(path, img_ids, report):
@@ -48,7 +54,7 @@ def load_masks(path, img_ids, report):
     """
     if report:
         img_ids = tqdm(img_ids)
-    return np.array([load_mask(path+img_id) for img_id in img_ids])
+    return [load_mask(path+img_id) for img_id in img_ids]
 
 
 def load_train_set(path, report=True):
@@ -78,17 +84,24 @@ def load_test_set(path, report=True):
     return to_return
 
 
-def compare_images(imlist1, imlist2, sample=3, title1='', title2=''):
+def compare_images(imlist1, imlist2, sample=3, title1='', title2='', grayscale_input=True):
     """
     display some random samples with the same index number from the two list of images
     """
     _, axis = plt.subplots(sample, 2, figsize=(12, sample*6))
     samples = random.sample(range(len(imlist1)), sample)
-    for i, sample in enumerate(samples):
-        axis[i, 0].set_title(title1)
-        axis[i, 0].imshow(imlist1[sample])
-        axis[i, 1].set_title(title2)
-        axis[i, 1].imshow(imlist2[sample])
+    if grayscale_input:
+        for i, sample in enumerate(samples):
+            axis[i, 0].set_title(title1)
+            axis[i, 0].imshow(np.squeeze(imlist1[sample], axis=-1))
+            axis[i, 1].set_title(title2)
+            axis[i, 1].imshow(np.squeeze(imlist2[sample], axis=-1))
+    else:
+        for i, sample in enumerate(samples):
+            axis[i, 0].set_title(title1)
+            axis[i, 0].imshow(imlist1[sample])
+            axis[i, 1].set_title(title2)
+            axis[i, 1].imshow(imlist2[sample])
 
 
 def get_dim_stat(images):
@@ -108,15 +121,19 @@ def get_dim_stat(images):
     )
 
 
-def standardize_images(img_list, shape=None, grayscale=True, dtype=np.float32):
+def standardize_images(img_list, shape=None, inverse_color_threshold=1, dtype=np.float32):
     """
     given a list of images, return a resized version where all the images within have
     the same shape
     load the test set from the given path
     """
-    to_return = [np.expand_dims(rgb2gray(img), axis=-1) if grayscale else img[:, :, :3] for img in img_list]
+    to_return = [np.expand_dims(rgb2gray(img), axis=-1) for img in img_list]
     if shape is not None:
         to_return = [resize(img, shape) for img in to_return]
+    if 1 > inverse_color_threshold > 0:
+        for i, img in enumerate(to_return):
+            if np.mean(img) > inverse_color_threshold:
+                to_return[i] = 1 - img
     return np.array(to_return, dtype=dtype)
 
 
